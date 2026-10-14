@@ -35,6 +35,8 @@ final class ObdSession implements Closeable {
     private String ecu;
     private final ScheduledExecutorService transactionTimer = Executors.newSingleThreadScheduledExecutor();
     private boolean bundle = true;
+    private volatile int focusedCylinder = 5;
+    void focusCylinder(int cylinder) { if(cylinder>=1 && cylinder<=profile.cylinders()) focusedCylinder=cylinder; }
     private String link;
     private final Set<Integer> supported = new HashSet<>();
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -50,6 +52,7 @@ final class ObdSession implements Closeable {
     private void run() {
         try {
             log = new SessionLog(directory, profile); csvFile = log.csv; rawFile = log.raw;
+            log.raw("# SESSION", "Build 2 / 0.1.2; profile=" + profile.name() + "; adapter=" + device.getName());
             listener.status("Connecting to " + device.getName() + "…", true);
             connect(false);
             InputStream input = socket.getInputStream();
@@ -61,13 +64,16 @@ final class ObdSession implements Closeable {
             }
             reader = new PromptReader(input, socket.getOutputStream(), this::closeSocket);
             query("ATZ", 5000);
-            for (String command : new String[]{"ATE0", "ATL0", "ATS1", "ATH1", "ATSP0", "ATAT1", "ATSTFF"}) required(command);
+            for (String command : new String[]{"ATE0", "ATL0", "ATS1", "ATH1", "ATAT1", "ATSTFF"}) required(command);
             // AL allows full Mode 06 records and DTC/VIN multi-frame replies; clones may reject it.
             query("ATAL", 2000);
-            String first = query("0100", 16000);
-            int protocol = FordData.protocol(query("ATDPN", 2000));
+            query("ATRV", 2000); // Adapter supply measurement only; not an ignition-state claim.
+            ProtocolNegotiator.Result handshake = ProtocolNegotiator.negotiate(profile, this::query,
+                text -> listener.status(text,true));
+            String first = handshake.reply();
+            int protocol = handshake.protocol();
             can = protocol >= 6;
-            ecu = FrameDecoder.engineEcu(can, protocol);
+            ecu = handshake.ecu();
             if (can) {
                 required("ATD0"); required("ATCAF1"); required("ATCFC1");
                 first = query("0100", 4000);
@@ -111,7 +117,7 @@ final class ObdSession implements Closeable {
                     int pid = LIVE[liveIndex++ % LIVE.length];
                     if (pid != 0x0C && supported.contains(pid)) readLive(pid);
                 }
-                if (can) { readCylinder(c); c = c % profile.cylinders() + 1; }
+                if (can) { readCylinder(c); int focus=focusedCylinder; if(focus!=c)readCylinder(focus); c = c % profile.cylinders() + 1; }
                 else if (ticks++ % 5 == 0) readCylinder(1);
                 if (scanRequest.getAndSet(false)) {
                     for (int i = 1; i <= profile.cylinders() && !closed; i++) readCylinder(i);
@@ -126,7 +132,11 @@ final class ObdSession implements Closeable {
                 if (pause > 0) Thread.sleep(pause);
             }
         } catch (Exception e) {
-            if (!closed) listener.status("Disconnected: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()), false);
+            if (!closed) {
+                String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                if (log != null) try { log.raw("# ERROR", message); } catch (IOException ignored) {}
+                listener.status("Disconnected: " + message, false);
+            }
         } finally {
             closeSocket(); transactionTimer.shutdownNow();
             if (log != null) try { log.close(); } catch (IOException ignored) {}

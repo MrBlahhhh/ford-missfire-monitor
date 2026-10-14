@@ -46,6 +46,6 @@ public final class PromptReader {
             || command.matches("01(04|05|06|07|08|09|0C|0D|0F|11){2,6}")
             || command.matches("06(00|20|40|60|80|A0|A[2-9AB]|53)")
             || command.matches("03|07|0A|0902")
-            || command.matches("ATZ|ATE0|ATL0|ATS1|ATH1|ATD0|ATAL|ATCAF1|ATCFC1|ATSP0|ATAT1|ATSTFF|ATDPN|ATI");
+            || command.matches("ATZ|ATE0|ATL0|ATS1|ATH1|ATD0|ATAL|ATCAF1|ATCFC1|ATSP0|ATTP0|ATTP1|ATTP6|ATTP7|ATRV|ATAT1|ATSTFF|ATDPN|ATI");
     }
 }

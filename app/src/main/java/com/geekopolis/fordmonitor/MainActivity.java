@@ -15,6 +15,7 @@ import android.provider.Settings;
 import android.view.*;
 import android.widget.*;
 import com.geekopolis.fordmonitor.core.FordData;
+import com.geekopolis.fordmonitor.core.MisfireHistory;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -27,7 +28,13 @@ public final class MainActivity extends Activity {
     private final Map<Integer, Reading> live = new HashMap<>();
     private final Map<Integer, Cylinder> cylinders = new HashMap<>();
     private final Map<Integer, TextView> cylinderViews = new HashMap<>();
-    private Spinner profileSpinner, deviceSpinner;
+    private Spinner profileSpinner, deviceSpinner, graphCylinder;
+    private final MisfireHistory history = new MisfireHistory();
+    private LoadMisfireView graph;
+    private TextView graphSummary;
+    private LinearLayout graphSection;
+    private ScrollView scroll;
+    private int selectedCylinder=5;
     private TextView status, ready, codes, headline;
     private Button connect;
     private final List<BluetoothDevice> devices = new ArrayList<>();
@@ -45,7 +52,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(BG);
+        scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(BG);
         root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(20), dp(12), dp(20), dp(20));
         scroll.addView(root); setContentView(scroll);
         if (Build.VERSION.SDK_INT >= 30) scroll.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -59,14 +66,14 @@ public final class MainActivity extends Activity {
         });
         add(text("FORD / MISFIRE MONITOR", 13, TEAL));
         headline = text("Your engine, cylinder by cylinder", 27, WHITE); headline.setTypeface(null, Typeface.BOLD); add(headline);
-        add(text("Personal edition · build 1", 12, MUTED));
+        add(text("Personal edition · build 3", 12, MUTED));
         profileSpinner = new Spinner(this);
         profileSpinner.setAdapter(adapter(new String[]{FordData.F150.name(), FordData.V10.name()})); add(profileSpinner);
         int savedProfile = getPreferences(MODE_PRIVATE).getInt("profile", 0); profileSpinner.setSelection(savedProfile == 1 ? 1 : 0);
         profileSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                 getPreferences(MODE_PRIVATE).edit().putInt("profile", pos).apply();
-                disconnect(); live.clear(); cylinders.clear(); createCylinders(); render();
+                disconnect(); history.clear(); live.clear(); cylinders.clear(); createCylinders(); configureGraphCylinders(); render();
             }
             public void onNothingSelected(AdapterView<?> p) {}
         });
@@ -81,6 +88,19 @@ public final class MainActivity extends Activity {
         add(text("Current/last driving-cycle counts and 10-cycle weighted averages, when reported. ECU results may update slowly. Zero does not prove the monitor is active.", 13, MUTED));
         cylinderBox = new LinearLayout(this); cylinderBox.setOrientation(LinearLayout.VERTICAL); add(cylinderBox); createCylinders();
         button(root, "Refresh all cylinders", v -> { if (session != null && connected) session.requestScan(); else toast("Connect first"); });
+        graphSection = new LinearLayout(this); graphSection.setOrientation(LinearLayout.VERTICAL); add(graphSection);
+        graphSection.addView(text("LOAD & NEW MISFIRES",13,TEAL));
+        graphCylinder = new Spinner(this); graphSection.addView(graphCylinder); configureGraphCylinders();
+        graphCylinder.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            public void onItemSelected(AdapterView<?> p,View v,int pos,long id) {
+                selectedCylinder=pos+1; if(session!=null)session.focusCylinder(selectedCylinder); render();
+            }
+            public void onNothingSelected(AdapterView<?> p) {}
+        });
+        graph = new LoadMisfireView(this,history); panel(graph); graphSection.addView(graph,new LinearLayout.LayoutParams(-1,dp(255)));
+        graphSummary=text("Connect to record new count increases.",13,WHITE); graphSection.addView(graphSummary);
+        graphSection.addView(text("Teal: engine load. Orange: count increases since the previous read. Only changes after connecting are counted. ECU updates may lag; bars cover the interval between reads.",12,MUTED));
+        button(graphSection,"Clear graph",v->{history.clear();render();});
         add(text("LIVE ENGINE DATA", 13, TEAL));
         for (int[] pair : new int[][]{{0x0C,0x05},{0x06,0x07},{0x08,0x09},{0x04,0x0D},{0x0F,0x11}}) {
             LinearLayout r = row();
@@ -130,7 +150,7 @@ public final class MainActivity extends Activity {
         if (!permission()) { loadDevices(); return; }
         int index = deviceSpinner.getSelectedItemPosition();
         if (index < 0 || index >= devices.size()) { toast("Pair an adapter first, then refresh devices"); return; }
-        disconnect(); long token = ++epoch;
+        disconnect(); history.clear(); long token = ++epoch;
         live.clear(); cylinders.clear(); ready.setText("Reading misfire readiness…"); codes.setText("Codes not read in this session");
         BluetoothDevice device = devices.get(index);
         getPreferences(MODE_PRIVATE).edit().putString("device",device.getAddress()).apply();
@@ -142,19 +162,25 @@ public final class MainActivity extends Activity {
                 if (session != null) { csv = session.csvFile; raw = session.rawFile; }
                 if (!running) { live.clear(); cylinders.clear(); ready.setText("Disconnected · readiness is not current"); render(); }
             }); }
-            public void live(int pid, Double value) { post(() -> { live.put(pid,new Reading(value,SystemClock.elapsedRealtime())); render(); }); }
+            public void live(int pid, Double value) { post(() -> { long time=SystemClock.elapsedRealtime(); live.put(pid,new Reading(value,time)); if(pid==4)history.load(time,value); render(); }); }
             public void cylinder(int c, List<FordData.Misfire> values, String note) { post(() -> {
-                cylinders.put(c,new Cylinder(Collections.unmodifiableList(new ArrayList<>(values)),note,SystemClock.elapsedRealtime())); render();
+                long time=SystemClock.elapsedRealtime();
+                cylinders.put(c,new Cylinder(Collections.unmodifiableList(new ArrayList<>(values)),note,time));
+                boolean cycle=false;
+                for(FordData.Misfire m:values)if(m.tid()==0x0C && m.unit().equals("counts") && m.evaluated()) {
+                    history.count(c,time,(int)m.value()); cycle=true; break;
+                }
+                if(!cycle)history.unavailable(c,time); render();
             }); }
             public void readiness(String text) { post(() -> ready.setText(text)); }
             public void codes(String text) { post(() -> codes.setText(text)); }
         });
-        session.start();
+        session.focusCylinder(selectedCylinder); session.start();
     }
     private void disconnect() {
         epoch++;
         if (session != null) { lastSession = session; session.close(); if (session.csvFile != null) csv = session.csvFile; if (session.rawFile != null) raw = session.rawFile; session = null; }
-        connected = false;
+        connected = false; history.pause();
         if (status != null) status.setText("Disconnected · connect to read current data");
         live.clear(); cylinders.clear();
         if (ready != null) ready.setText("Disconnected · readiness is not current");
@@ -174,13 +200,27 @@ public final class MainActivity extends Activity {
             LinearLayout r = row();
             for (int n = c; n <= Math.min(c + columns - 1,profile().cylinders()); n++) {
                 TextView tv = text("Cylinder " + n + "\n—",16,WHITE); panel(tv); cylinderViews.put(n,tv);
+                final int chosen=n;
+                tv.setOnClickListener(v->{if(graphCylinder!=null){graphCylinder.setSelection(chosen-1);scroll.smoothScrollTo(0,graphSection.getTop());}});
                 r.addView(tv,new LinearLayout.LayoutParams(0,-2,1));
             }
             cylinderBox.addView(r);
         }
     }
+    private void configureGraphCylinders() {
+        if(graphCylinder==null)return;
+        String[] options=new String[profile().cylinders()];for(int i=0;i<options.length;i++)options[i]="Cylinder "+(i+1);
+        selectedCylinder=Math.min(selectedCylinder,options.length);graphCylinder.setAdapter(adapter(options));graphCylinder.setSelection(selectedCylinder-1);
+    }
     private void render() {
         long now = SystemClock.elapsedRealtime();
+        if(graph!=null)graph.update(selectedCylinder,connected);
+        if(graphSummary!=null) {
+            var points=history.changes(selectedCylinder);
+            String state=points.isEmpty()?"Waiting for cycle-count results":connected && !history.hasBaseline(selectedCylinder)?"Cycle count unavailable; waiting for a baseline":points.get(points.size()-1).reset()?"Counter reset; new baseline":
+                "New observed increases: "+history.observedIncrease(selectedCylinder)+" · last cycle count: "+points.get(points.size()-1).cycleCount();
+            graphSummary.setText(state+(connected?"":" · last session"));
+        }
         for (Map.Entry<Integer,TextView> entry : cylinderViews.entrySet()) {
             int c = entry.getKey(); Cylinder data = cylinders.get(c); StringBuilder text = new StringBuilder("CYLINDER " + c + "\n");
             boolean warning = false, fault = false;
@@ -189,11 +229,11 @@ public final class MainActivity extends Activity {
             else {
                 for (FordData.Misfire m : data.values) {
                     if (m.unit().equals("counts")) {
-                        text.append(m.kind().startsWith("Last") ? "Cycle: " : "Avg: ").append((int)m.value()).append(" counts\n");
+                        text.append(m.tid()==0x0C ? "Last/current cycle: " : "10-cycle avg: ").append((int)m.value()).append(" counts\n");
                         warning |= m.evaluated() && m.value() > 0; fault |= m.outsideLimit();
                     } else if (m.unit().equals("%")) {
                         text.append(String.format(Locale.US,"Stored: %.6f%%\n",m.value())); fault |= m.outsideLimit();
-                    } else text.append("Raw: ").append(m.raw()).append(String.format(Locale.ROOT," (unit %02X)\n",m.uasid()));
+                    } else text.append(m.tid()==0x0C ? "Cycle raw: " : "Avg raw: ").append(m.raw()).append(String.format(Locale.ROOT," (unit %02X)\n",m.uasid()));
                     if (!m.evaluated()) text.append(m.note()).append('\n');
                     if (m.outsideLimit()) text.append("Outside ECU limit\n");
                 }
@@ -262,7 +302,7 @@ public final class MainActivity extends Activity {
     private void panel(View v) { GradientDrawable bg = new GradientDrawable(); bg.setColor(CARD); bg.setCornerRadius(dp(12)); bg.setStroke(dp(2),BG); v.setBackground(bg); v.setPadding(dp(12),dp(12),dp(12),dp(12)); }
     private Button button(LinearLayout parent,String label,View.OnClickListener click) {
         Button b = new Button(this); b.setText(label); b.setAllCaps(false); b.setTextColor(WHITE); b.setOnClickListener(click);
-        if (parent == root) parent.addView(b,new LinearLayout.LayoutParams(-1,-2));
+        if (parent.getOrientation() == LinearLayout.VERTICAL) parent.addView(b,new LinearLayout.LayoutParams(-1,-2));
         else parent.addView(b,new LinearLayout.LayoutParams(0,-2,1)); return b;
     }
     private int dp(int value) { return Math.round(value*getResources().getDisplayMetrics().density); }

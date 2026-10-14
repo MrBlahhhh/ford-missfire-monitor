@@ -30,8 +30,9 @@ public final class FordData {
                 if (cyl < 1 || cyl > profile.cylinders()) continue;
                 int value = u16(b, p + 3), min = u16(b, p + 5), max = u16(b, p + 7);
                 if (tid != 0x0B && tid != 0x0C) continue;
-                // SAE UASID 0x24 is one count per bit. Unknown units remain explicit raw data.
-                boolean count = unit == 0x24;
+                // SAE 0x01 is unsigned raw 1/bit; Ford TIDs 0B/0C identify these as counts.
+                // UASID 0x24 explicitly encodes counts. Other scaling remains raw.
+                boolean count = unit == 0x24 || unit == 0x01;
                 String kind = tid == 0x0C ? "Last/current cycle" : "10-cycle weighted average";
                 out.add(new Misfire(cyl, kind, count ? "counts" : "raw", value,
                     count ? (double) min : null, count ? (double) max : null, mid, tid, unit, value,
