@@ -29,6 +29,12 @@ Evidence: user-supplied session dated 2026-10-14 21:50 UTC. Bluetooth and adapte
 
 The successful session also establishes actual F-150 CAN and bundled live requests. The earlier failed search occurred with the engine off according to Matt; it does not establish an adapter fault. Build 2's retry/diagnostic improvements remain included.
 
+## Build 4 all-cylinder graph
+
+- Added distinct lanes for all eight/ten cylinders with a common time/amplitude scale and per-cylinder observed totals.
+- All-cylinder mode is the default and selects a complete polling sweep; single-cylinder details remain available.
+- Interleaved load reads improve load visibility during the sweep. Query timestamps remain explicit; no synchronized sampling claim is made.
+
 ## Open acceptance gaps
 
 - **VEHICLE-01:** F-150 CAN and bundled live replies are confirmed from the phone transcript. The Winnebago/LX, additional calibrations and load/misfire timing still need physical validation.

@@ -34,7 +34,7 @@ public final class MainActivity extends Activity {
     private TextView graphSummary;
     private LinearLayout graphSection;
     private ScrollView scroll;
-    private int selectedCylinder=5;
+    private int selectedCylinder=0;
     private TextView status, ready, codes, headline;
     private Button connect;
     private final List<BluetoothDevice> devices = new ArrayList<>();
@@ -66,7 +66,7 @@ public final class MainActivity extends Activity {
         });
         add(text("FORD / MISFIRE MONITOR", 13, TEAL));
         headline = text("Your engine, cylinder by cylinder", 27, WHITE); headline.setTypeface(null, Typeface.BOLD); add(headline);
-        add(text("Personal edition · build 3", 12, MUTED));
+        add(text("Personal edition · build 4", 12, MUTED));
         profileSpinner = new Spinner(this);
         profileSpinner.setAdapter(adapter(new String[]{FordData.F150.name(), FordData.V10.name()})); add(profileSpinner);
         int savedProfile = getPreferences(MODE_PRIVATE).getInt("profile", 0); profileSpinner.setSelection(savedProfile == 1 ? 1 : 0);
@@ -93,13 +93,13 @@ public final class MainActivity extends Activity {
         graphCylinder = new Spinner(this); graphSection.addView(graphCylinder); configureGraphCylinders();
         graphCylinder.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> p,View v,int pos,long id) {
-                selectedCylinder=pos+1; if(session!=null)session.focusCylinder(selectedCylinder); render();
+                selectedCylinder=pos; if(session!=null)session.focusCylinder(selectedCylinder); render();
             }
             public void onNothingSelected(AdapterView<?> p) {}
         });
         graph = new LoadMisfireView(this,history); panel(graph); graphSection.addView(graph,new LinearLayout.LayoutParams(-1,dp(255)));
         graphSummary=text("Connect to record new count increases.",13,WHITE); graphSection.addView(graphSummary);
-        graphSection.addView(text("Teal: engine load. Orange: count increases since the previous read. Only changes after connecting are counted. ECU updates may lag; bars cover the interval between reads.",12,MUTED));
+        graphSection.addView(text("Teal: engine load. Colored cylinder lanes: count increases since each previous read. Right-side + totals cover the displayed history. Only changes after connecting are counted. ECU updates may lag; bars cover the interval between reads.",12,MUTED));
         button(graphSection,"Clear graph",v->{history.clear();render();});
         add(text("LIVE ENGINE DATA", 13, TEAL));
         for (int[] pair : new int[][]{{0x0C,0x05},{0x06,0x07},{0x08,0x09},{0x04,0x0D},{0x0F,0x11}}) {
@@ -201,7 +201,7 @@ public final class MainActivity extends Activity {
             for (int n = c; n <= Math.min(c + columns - 1,profile().cylinders()); n++) {
                 TextView tv = text("Cylinder " + n + "\n—",16,WHITE); panel(tv); cylinderViews.put(n,tv);
                 final int chosen=n;
-                tv.setOnClickListener(v->{if(graphCylinder!=null){graphCylinder.setSelection(chosen-1);scroll.smoothScrollTo(0,graphSection.getTop());}});
+                tv.setOnClickListener(v->{if(graphCylinder!=null){graphCylinder.setSelection(chosen);scroll.smoothScrollTo(0,graphSection.getTop());}});
                 r.addView(tv,new LinearLayout.LayoutParams(0,-2,1));
             }
             cylinderBox.addView(r);
@@ -209,17 +209,31 @@ public final class MainActivity extends Activity {
     }
     private void configureGraphCylinders() {
         if(graphCylinder==null)return;
-        String[] options=new String[profile().cylinders()];for(int i=0;i<options.length;i++)options[i]="Cylinder "+(i+1);
-        selectedCylinder=Math.min(selectedCylinder,options.length);graphCylinder.setAdapter(adapter(options));graphCylinder.setSelection(selectedCylinder-1);
+        String[] options=new String[profile().cylinders()+1];options[0]="All "+profile().cylinders()+" cylinders";
+        for(int i=1;i<options.length;i++)options[i]="Cylinder "+i;
+        selectedCylinder=Math.min(selectedCylinder,profile().cylinders());graphCylinder.setAdapter(adapter(options));graphCylinder.setSelection(selectedCylinder);
     }
     private void render() {
         long now = SystemClock.elapsedRealtime();
-        if(graph!=null)graph.update(selectedCylinder,connected);
+        if(graph!=null){
+            graph.update(selectedCylinder,profile().cylinders(),connected);
+            android.view.ViewGroup.LayoutParams layout=graph.getLayoutParams();int height=dp(graph.heightDp());
+            if(layout.height!=height){layout.height=height;graph.setLayoutParams(layout);}
+        }
         if(graphSummary!=null) {
+            if(selectedCylinder==0){
+                StringJoiner totals=new StringJoiner(" · ");
+                for(int c=1;c<=profile().cylinders();c++){
+                    boolean known=!history.changes(c).isEmpty() && (!connected || history.hasBaseline(c));
+                    totals.add("C"+c+(known?" +"+history.observedIncrease(c):" —"));
+                }
+                graphSummary.setText("Observed increases: "+totals+(connected?"":" · last session"));
+            }else{
             var points=history.changes(selectedCylinder);
             String state=points.isEmpty()?"Waiting for cycle-count results":connected && !history.hasBaseline(selectedCylinder)?"Cycle count unavailable; waiting for a baseline":points.get(points.size()-1).reset()?"Counter reset; new baseline":
                 "New observed increases: "+history.observedIncrease(selectedCylinder)+" · last cycle count: "+points.get(points.size()-1).cycleCount();
             graphSummary.setText(state+(connected?"":" · last session"));
+            }
         }
         for (Map.Entry<Integer,TextView> entry : cylinderViews.entrySet()) {
             int c = entry.getKey(); Cylinder data = cylinders.get(c); StringBuilder text = new StringBuilder("CYLINDER " + c + "\n");

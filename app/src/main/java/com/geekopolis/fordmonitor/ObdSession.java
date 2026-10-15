@@ -35,8 +35,8 @@ final class ObdSession implements Closeable {
     private String ecu;
     private final ScheduledExecutorService transactionTimer = Executors.newSingleThreadScheduledExecutor();
     private boolean bundle = true;
-    private volatile int focusedCylinder = 5;
-    void focusCylinder(int cylinder) { if(cylinder>=1 && cylinder<=profile.cylinders()) focusedCylinder=cylinder; }
+    private volatile int focusedCylinder = 0;
+    void focusCylinder(int cylinder) { if(cylinder>=0 && cylinder<=profile.cylinders()) focusedCylinder=cylinder; }
     private String link;
     private final Set<Integer> supported = new HashSet<>();
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -117,7 +117,15 @@ final class ObdSession implements Closeable {
                     int pid = LIVE[liveIndex++ % LIVE.length];
                     if (pid != 0x0C && supported.contains(pid)) readLive(pid);
                 }
-                if (can) { readCylinder(c); int focus=focusedCylinder; if(focus!=c)readCylinder(focus); c = c % profile.cylinders() + 1; }
+                if (can) {
+                    int focus=focusedCylinder;
+                    for(int cylinder:PollingPlan.cylinders(profile.cylinders(),focus,c)){
+                        readCylinder(cylinder);
+                        // Keep load observations interleaved with the all-cylinder sweep.
+                        if(focus==0 && cylinder%2==0 && cylinder<profile.cylinders() && supported.contains(4))readLive(4);
+                    }
+                    c = c % profile.cylinders() + 1;
+                }
                 else if (ticks++ % 5 == 0) readCylinder(1);
                 if (scanRequest.getAndSet(false)) {
                     for (int i = 1; i <= profile.cylinders() && !closed; i++) readCylinder(i);

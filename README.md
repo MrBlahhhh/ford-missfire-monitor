@@ -1,6 +1,6 @@
 # Ford Misfire Monitor
 
-Personal Android app for Matt's **2004 F-150 5.4L three-valve V8** and **2017 Winnebago Ford V10**, using a paired classic-Bluetooth **OBDLink LX** or compatible **ELM327**. Android 8.0+; build 3 / version 0.1.3. Separate project; no changes to the other vehicle apps.
+Personal Android app for Matt's **2004 F-150 5.4L three-valve V8** and **2017 Winnebago Ford V10**, using a paired classic-Bluetooth **OBDLink LX** or compatible **ELM327**. Android 8.0+; build 4 / version 0.1.4. Separate project; no changes to the other vehicle apps.
 
 ## What it does
 
@@ -11,9 +11,15 @@ Personal Android app for Matt's **2004 F-150 5.4L three-valve V8** and **2017 Wi
 - Stored/pending/permanent engine code reading, readiness since clear, CAN VIN capture with profile-year mismatch notice, CSV and raw adapter transcript export through Android's file picker.
 - Local logs only, no account/internet permission/ads. Last 20 sessions retained; CSV/transcript independently stop recording at 8 MiB while monitoring continues with a visible notice. Reconnect starts another file. Export closes/flushes the session before copying it.
 
+## Build 4: all-cylinder graph
+
+The graph defaults to **All 8 cylinders** or **All 10 cylinders**, following the vehicle profile. Engine load appears above distinct C1–C8/C10 colored lanes. Each lane plots new count increases over the same time axis and amplitude scale; right-side + totals summarize the displayed history. Unknown results remain unavailable instead of zero. The selector can still isolate one cylinder, and tapping a card opens its detail graph.
+
+All mode reads a complete cylinder sweep each polling cycle, with engine-load reads interleaved every two cylinders. OBD monitor requests remain sequential, so their timestamps differ; the screen shows all cylinders together without pretending the ECU sampled them simultaneously. Historical averages and initial counter baselines remain excluded from new events.
+
 ## Build 3: load versus new misfires
 
-Tap a cylinder card or use the graph selector (default cylinder 5). Teal plots engine load; orange bars show positive changes in the selected cylinder's **last/current-cycle** count over each interval between reads. The historical 10-cycle average is never used to calculate new events. Connecting/clearing the local graph establishes a baseline; counter decreases, unavailable data, long gaps and disconnects break that baseline. No ECU counters are cleared.
+Tap a cylinder card or use the graph selector (build 3 default was cylinder 5; build 4 defaults to all cylinders). Teal plots engine load; orange bars show positive changes in the selected cylinder's **last/current-cycle** count over each interval between reads. The historical 10-cycle average is never used to calculate new events. Connecting/clearing the local graph establishes a baseline; counter decreases, unavailable data, long gaps and disconnects break that baseline. No ECU counters are cleared.
 
 The chart covers up to five minutes of bounded local history and retains the last session for inspection until the next connection/profile change. The selected cylinder is additionally polled each cycle, alongside the normal sweep; ECU updates can still lag the event, so the bars span read intervals rather than claim exact misfire timestamps. Use Export CSV for raw load/count readings with timestamps.
 
@@ -37,7 +43,7 @@ Monitoring runs while the app is visible and keeps the screen awake. Leaving it 
 
 ## Polling / data interpretation
 
-CAN startup reads each cylinder once. Thereafter one cylinder is refreshed per roughly one-second polling cycle alongside live-PID bundles and an extra read of the selected graph cylinder, so a full eight/ten-cylinder sweep normally takes about 8/10 seconds, longer if the ECU responds slowly. Refresh all cylinders forces a complete sweep. Legacy TID $53 reads all cylinders approximately every five cycles. Each card shows its actual last-read age; live gauges blank after 15 seconds and cylinder results are marked stale after 30 seconds.
+CAN startup reads each cylinder once. In all-cylinder mode, every cycle reads all eight/ten cylinders, with load reads interleaved every two cylinders. Sweep duration depends on adapter/ECU response time and can take several seconds. Single-cylinder detail retains round-robin polling plus an extra read of the selected cylinder. Refresh all cylinders forces a complete sweep. Legacy TID $53 reads all cylinders approximately every five cycles. Each card shows its actual last-read age; live gauges blank after 15 seconds and cylinder results are marked stale after 30 seconds.
 
 Counts are ECU monitor results, not a guaranteed instantaneous running total. The monitor may be disabled by operating conditions; readiness since clear is not an active-monitor flag. Nonzero counts are highlighted; a red limit indication uses the **ECU's returned limits**, never an invented universal alarm threshold. UASID $24 is decoded as one count per bit; UASID $01 is the same numeric scaling and is interpreted as counts only for Ford's known TIDs 0B/0C. Unknown scaling remains raw for review.
 

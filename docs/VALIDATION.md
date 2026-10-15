@@ -1,8 +1,8 @@
-# Build 3 validation — 2026-10-14
+# Build 4 validation — 2026-10-14
 
 ## Software checks
 
-- 107 diagnostic/history JVM tests: Ford V8/V10 cylinder mapping, mode/units/limit decoding, missing vs zero/unevaluated results, live PID conversions, readiness/DTC/VIN parsing, protocol detection, ECU filtering, ISO-TP assembly, 1,000 malformed input samples, read-only allowlist, prompt timeout/overflow/echo handling and CAN PID bundles.
+- 116 diagnostic/history JVM tests: Ford V8/V10 cylinder mapping, mode/units/limit decoding, missing vs zero/unevaluated results, live PID conversions, readiness/DTC/VIN parsing, protocol detection, ECU filtering, ISO-TP assembly, 1,000 malformed input samples, read-only allowlist, prompt timeout/overflow/echo handling and CAN PID bundles.
 - 5 local-log JVM tests: CSV quoting/canonical units, unique session files, 20-session retention and both file caps continuing monitoring.
 - Debug APK build and Android lint: required to pass before delivery; remaining warnings are English-only string localization and custom-view accessibility guidance.
 - Tablet emulator: app launch, both vehicle profiles, no-adapter behavior and screen layout. Build 1 was installed on Matt's Pixel; actual F-150 CAN and bundled replies were verified from its saved logs. No live vehicle commands were issued by the agent.
@@ -16,6 +16,10 @@ The submitted `UNABLE TO CONNECT` / `A0` transcript is reproduced in a scripted 
 112 JVM tests across diagnostic parsing, protocol negotiation, local logging and graph history. The actual cylinder 5 reply is a regression fixture (no VIN/personal data). Graph tests cover initial historical values, positive deltas, unchanged/reset counts, per-cylinder isolation, 30-second gaps, unavailable results, out-of-order callbacks, local clear/disconnect and bounded retention.
 
 Visual smoke check uses a separate instrumentation APK on an isolated emulator only. Synthetic chart samples never enter the release APK or vehicle session log. Rendering, graph summary and baseline/delta smoke checks passed. Physical load/misfire correlation remains an acceptance task.
+
+## Build 4
+
+121 JVM tests including all-eight/all-ten polling plans, no duplicate focus reads, invalid-profile handling and independent cylinder baselines/resets/unavailable results. Emulator rendering checks cover V8 and V10 lane layouts, including cylinders 9/10. Physical all-cylinder/load timing still depends on ECU response/update cadence.
 
 ## First vehicle check
 

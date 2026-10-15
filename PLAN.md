@@ -23,6 +23,13 @@
 - [x] Add selected-cylinder load/new-count graph, bounded history and focused polling.
 - [x] Test baseline/reset/gap handling and real captured reply decoding.
 
+## Build 4
+
+- [x] Default graph to all cylinders for the selected V8/V10 profile.
+- [x] Display separate colored lanes with common time/scale and independent baseline/reset handling.
+- [x] Poll full cylinder sweeps in all mode; interleave engine-load reads.
+- [x] Add V8/V10 all-mode polling/history tests and emulator rendering checks.
+
 ## Vehicle acceptance / next work
 
 - [x] Confirm 2004 F-150 CAN, per-cylinder result mapping and batch support from the saved ELM327-compatible session.
