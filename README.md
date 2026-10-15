@@ -1,6 +1,6 @@
 # Ford Misfire Monitor
 
-Personal Android app for Matt's **2004 F-150 5.4L three-valve V8** and **2017 Winnebago Ford V10**, using a paired classic-Bluetooth **OBDLink LX** or compatible **ELM327**. Android 8.0+; build 4 / version 0.1.4. Separate project; no changes to the other vehicle apps.
+Personal Android app for Matt's **2004 F-150 5.4L three-valve V8** and **2017 Winnebago Ford V10**, using a paired classic-Bluetooth **OBDLink LX** or compatible **ELM327**. Android 8.0+; build 5 / version 0.1.5. Separate project; no changes to the other vehicle apps.
 
 ## What it does
 

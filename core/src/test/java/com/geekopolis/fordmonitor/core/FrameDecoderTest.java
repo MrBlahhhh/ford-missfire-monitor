@@ -8,6 +8,19 @@ public class FrameDecoderTest {
         assertEquals(1,m.size()); assertArrayEquals(new byte[]{0x41,0x0C,0x1F,0x40},m.get(0).data());
     }
     @Test public void can29Bit() { assertEquals("18DAF110",FrameDecoder.decode("18DAF110 03 41 05 50",true).get(0).ecu()); }
+    // What an ELM327 actually prints for a 29-bit reply with ATH1 and ATS1.
+    @Test public void can29BitSpacedHeader() {
+        var m=FrameDecoder.decode("18 DA F1 10 06 41 00 BE 3F B8 13 00\r>",true);
+        assertEquals(1,m.size()); assertEquals("18DAF110",m.get(0).ecu());
+        assertArrayEquals(new byte[]{0x41,0x00,(byte)0xBE,0x3F,(byte)0xB8,0x13},m.get(0).data());
+    }
+    @Test public void can29BitSpacedMultiFrame() {
+        var m=FrameDecoder.fromEngine("18 DA F1 10 10 0A 46 A2 0C 24 00 05\r18 DA F1 10 21 00 00 FF FF 00 00 00",true,"18DAF110");
+        assertEquals(1,m.size()); assertEquals(10,m.get(0).length); assertEquals(0xFF,m.get(0)[9]&255);
+    }
+    @Test public void can29BitSpacedOtherEcuFiltered() {
+        assertTrue(FrameDecoder.fromEngine("18 DA F1 18 03 41 05 50",true,"18DAF110").isEmpty());
+    }
     @Test public void filterTransmission() {
         assertEquals(1,FrameDecoder.fromEngine("7E9 03 41 05 60\r7E8 03 41 05 50",true,"7E8").size());
     }

@@ -52,7 +52,8 @@ final class ObdSession implements Closeable {
     private void run() {
         try {
             log = new SessionLog(directory, profile); csvFile = log.csv; rawFile = log.raw;
-            log.raw("# SESSION", "Build 2 / 0.1.2; profile=" + profile.name() + "; adapter=" + device.getName());
+            log.raw("# SESSION", "Build " + BuildConfig.VERSION_CODE + " / " + BuildConfig.VERSION_NAME
+                + "; profile=" + profile.name() + "; adapter=" + device.getName());
             listener.status("Connecting to " + device.getName() + "…", true);
             connect(false);
             InputStream input = socket.getInputStream();

@@ -66,7 +66,7 @@ public final class MainActivity extends Activity {
         });
         add(text("FORD / MISFIRE MONITOR", 13, TEAL));
         headline = text("Your engine, cylinder by cylinder", 27, WHITE); headline.setTypeface(null, Typeface.BOLD); add(headline);
-        add(text("Personal edition · build 4", 12, MUTED));
+        add(text("Personal edition · build " + BuildConfig.VERSION_CODE, 12, MUTED));
         profileSpinner = new Spinner(this);
         profileSpinner.setAdapter(adapter(new String[]{FordData.F150.name(), FordData.V10.name()})); add(profileSpinner);
         int savedProfile = getPreferences(MODE_PRIVATE).getInt("profile", 0); profileSpinner.setSelection(savedProfile == 1 ? 1 : 0);

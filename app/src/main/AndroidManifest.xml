@@ -5,7 +5,7 @@
     <application android:allowBackup="false" android:dataExtractionRules="@xml/data_extraction_rules" android:label="Ford Misfire Monitor"
         android:icon="@drawable/ic_monitor" android:theme="@style/AppTheme" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -29,6 +29,10 @@ public class ProtocolNegotiatorTest {
         Script s=new Script("OK","UNABLE TO CONNECT","A0","OK","NO DATA","6","OK","18DAF110 06 41 00 BE 3F B8 13 00","7");
         assertEquals(7,ProtocolNegotiator.negotiate(FordData.V10,s,x->{}).protocol());assertFalse(s.commands.contains("ATTP1"));
     }
+    @Test public void v10AcceptsSpaced29BitHeader() throws Exception {
+        Script s=new Script("OK","UNABLE TO CONNECT","A0","OK","NO DATA","6","OK","18 DA F1 10 06 41 00 BE 3F B8 13 00","7");
+        var r=ProtocolNegotiator.negotiate(FordData.V10,s,x->{});assertEquals(7,r.protocol());assertEquals("18DAF110",r.ecu());
+    }
     @Test public void transmissionReplyNotSuccess() throws Exception {
         Script s=new Script("OK","7E9 06 41 00 BE 3F B8 13 00","A6","OK",CAN,"6");
         ProtocolNegotiator.negotiate(FordData.F150,s,x->{});assertEquals(6,s.commands.size());

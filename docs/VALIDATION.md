@@ -21,6 +21,10 @@ Visual smoke check uses a separate instrumentation APK on an isolated emulator o
 
 121 JVM tests including all-eight/all-ten polling plans, no duplicate focus reads, invalid-profile handling and independent cylinder baselines/resets/unavailable results. Emulator rendering checks cover V8 and V10 lane layouts, including cylinders 9/10. Physical all-cylinder/load timing still depends on ECU response/update cadence.
 
+## Build 5
+
+125 JVM tests. New: spaced 29-bit headers in single and multi-frame replies, another 29-bit ECU filtered out, and the V10 handshake accepting a spaced 29-bit engine reply. Debug APK and lint pass. Not run on a vehicle or emulator; the 29-bit path still has no real capture.
+
 ## First vehicle check
 
 1. Use OBDLink LX first. Select the right profile, ignition on, adapter paired, other scanner apps closed.

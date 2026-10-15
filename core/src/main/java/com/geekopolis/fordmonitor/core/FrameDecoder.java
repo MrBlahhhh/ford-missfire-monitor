@@ -19,9 +19,14 @@ public final class FrameDecoder {
         for (String line : reply.toUpperCase(Locale.ROOT).split("[\r\n>]+")) {
             String[] words = line.trim().split("\\s+");
             if (can) {
-                if (words.length < 3 || !words[0].matches("[0-9A-F]{3}|[0-9A-F]{8}")) continue;
-                String ecu = words[0];
-                byte[] b = bytes(words, 1, words.length);
+                // With S1 the ELM prints a 29-bit ID as four bytes, "18 DA F1 10" (ELM327DS p46);
+                // an 11-bit ID is one three-digit word. The unspaced form is accepted as before.
+                int header = words.length >= 6 && words[0].matches("[0-9A-F]{2}") ? 4 : 1;
+                if (words.length < header + 2) continue;
+                String ecu = String.join("", Arrays.copyOfRange(words, 0, header));
+                if (header == 4 ? !String.join(" ", Arrays.copyOfRange(words, 0, 4)).matches("[0-9A-F]{2}( [0-9A-F]{2}){3}")
+                                : !ecu.matches("[0-9A-F]{3}|[0-9A-F]{8}")) continue;
+                byte[] b = bytes(words, header, words.length);
                 if (b == null || b.length < 2 || b.length > 8) continue;
                 int pci = b[0] & 255, kind = pci >>> 4;
                 if (kind == 0) {

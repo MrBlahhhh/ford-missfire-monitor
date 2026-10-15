@@ -35,6 +35,14 @@ The successful session also establishes actual F-150 CAN and bundled live reques
 - All-cylinder mode is the default and selects a complete polling sweep; single-cylinder details remain available.
 - Interleaved load reads improve load visibility during the sweep. Query timestamps remain explicit; no synchronized sampling claim is made.
 
+## Build 5 review fixes (2026-10-14)
+
+Whole-repo review. Nothing here was run on a vehicle.
+
+- **CAN29-01 fixed:** with `ATH1`/`ATS1` the ELM327 prints a 29-bit ID as four bytes (`18 DA F1 10 06 41 00 ...`, ELM327 data sheet p46). `FrameDecoder` only accepted one 8-digit word, so every real 29-bit line was dropped and the V10's third handshake attempt (CAN 29-bit) could never pass, even with the engine answering. The test fixtures used the unspaced form, which an adapter with spaces on doesn't send. Both forms decode now. 11-bit lines are unchanged: their first word is always three digits.
+- **LOG-02 fixed:** the `# SESSION` line of every debug transcript said `Build 2 / 0.1.2` through build 4, so LOG-01's build stamp was wrong in every log since build 3. It and the on-screen label now come from `BuildConfig`.
+- **LIFE-01 fixed:** `configChanges` didn't cover `uiMode` or `smallestScreenSize`. Auto dark mode at sunset, a car dock, or resizing the window on the tablet recreated the activity; `onStop` then disconnected the adapter mid-drive and the new instance started with an empty graph. The views use fixed colors and rebuild in `onConfigurationChanged`, so nothing needs the recreate.
+
 ## Open acceptance gaps
 
 - **VEHICLE-01:** F-150 CAN and bundled live replies are confirmed from the phone transcript. The Winnebago/LX, additional calibrations and load/misfire timing still need physical validation.
